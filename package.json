@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "nodemon --exec tsx src/server.ts"
   },
   "repository": {
     "type": "git",
@@ -17,5 +20,14 @@
   "bugs": {
     "url": "https://github.com/NeeloByron/-Async-Weather-And-News-Dashboard/issues"
   },
-  "homepage": "https://github.com/NeeloByron/-Async-Weather-And-News-Dashboard#readme"
+  "homepage": "https://github.com/NeeloByron/-Async-Weather-And-News-Dashboard#readme",
+  "dependencies": {
+    "@types/code": "^4.0.8",
+    "ts-node": "^10.9.2",
+    "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "tsx": "^4.23.13"
+  }
 }
