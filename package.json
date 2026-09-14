@@ -23,6 +23,7 @@
   "homepage": "https://github.com/NeeloByron/-Async-Weather-And-News-Dashboard#readme",
   "dependencies": {
     "@types/code": "^4.0.8",
+    "dotenv": "^17.4.2",
     "ts-node": "^10.9.2",
     "typescript": "^7.0.2"
   },

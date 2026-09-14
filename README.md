@@ -6,3 +6,5 @@
 Callbacks, promises, and async/await</p>
 
 <hr>
+
+npm install dotenv // to load .env
