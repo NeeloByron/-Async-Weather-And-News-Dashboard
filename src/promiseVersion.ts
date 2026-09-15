@@ -89,3 +89,88 @@ function fetchWeather(city: string, country: string): Promise<Weather> {
       return { temperature: weather.main.temp, description: weather.weather[0].description };
     });
 }
+
+// fetch sample posts
+function fetchNews(): Promise<Post[]> {
+  return getJson("https://dummyjson.com/posts?limit=3").then((news) => {
+    if (!isRecord(news) || !Array.isArray(news.posts) ||
+        !news.posts.every((post: unknown) => isRecord(post) && typeof post.title === "string")) {
+      throw new Error("Unexpected news response.");
+    }
+    return news.posts as Post[];
+  });
+}
+
+function display(city: string, country: string, weather: Weather, posts: Post[]) {
+  console.log(`\nWeather in ${city}, ${country}`);
+  console.log(`Temperature: ${weather.temperature} °C`);
+  console.log(`Conditions: ${weather.description}`);
+  console.log("\nSample headlines (DummyJSON):");
+  posts.forEach((post, index) => console.log(`${index + 1}. ${post.title}`));
+}
+
+// 1. Sequential: weather finishes before news starts, then display both.
+function chainedExample(city: string, country: string): Promise<void> {
+  return fetchWeather(city, country)
+    .then((weather) => fetchNews().then((posts) => ({ weather, posts })))
+    .then(({ weather, posts }) => display(city, country, weather, posts));
+}
+
+// 2. Concurrent: start both now; wait until both fulfill.
+function allExample(city: string, country: string): Promise<void> {
+  return Promise.all([fetchWeather(city, country), fetchNews()])
+    .then(([weather, posts]) => display(city, country, weather, posts));
+}
+
+// 3. Race: show whichever result fulfills first (or reject on the first error).
+// The other request continues: Promise.race() does not cancel it.
+function raceExample(city: string, country: string): Promise<void> {
+  return Promise.race([
+    fetchWeather(city, country).then((weather) => ({ kind: "weather" as const, weather })),
+    fetchNews().then((posts) => ({ kind: "news" as const, posts })),
+  ]).then((winner) => {
+    console.log(`\n${winner.kind} finished first!`);
+    if (winner.kind === "weather") {
+      console.log(`${city}, ${country}: ${winner.weather.temperature} °C, ${winner.weather.description}`);
+    } else {
+      console.log("Sample headlines (DummyJSON):");
+      winner.posts.forEach((post, index) => console.log(`${index + 1}. ${post.title}`));
+    }
+  });
+}
+
+if (!apiKey) {
+  console.error("OPENWEATHER_API_KEY is not configured.");
+  process.exit(1);
+}
+if (!["chain", "all", "race"].includes(mode)) {
+  console.error("Choose a mode: chain, all, or race.");
+  process.exit(1);
+}
+
+const terminal = readline.createInterface({ input: process.stdin, output: process.stdout });
+const question = (prompt: string): Promise<string> =>
+  new Promise((resolve) => terminal.question(prompt, resolve));
+
+question("Which city are you in? ")
+  .then((answer) => {
+    const city = answer.trim();
+    if (!city) throw new Error("Please enter a city name.");
+    return question("Country code (e.g., ZA): ").then((answer) => {
+      const country = answer.trim().toUpperCase();
+      if (!/^[A-Z]{2}$/.test(country)) throw new Error("Please enter a two-letter country code.");
+      return { city, country };
+    });
+  })
+  .then(({ city, country }) => {
+    terminal.close();
+    console.log(`Fetching weather and sample headlines (${mode})...`);
+    if (mode === "all") return allExample(city, country);
+    if (mode === "race") return raceExample(city, country);
+    return chainedExample(city, country);
+  })
+  .catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  })
+  .finally(() => terminal.close());
