@@ -38,11 +38,18 @@ function getJson(url: URL | string): Promise<unknown> {
             }
         });
       });
+      // Handle request-level errors, such as  a connection failure.
       request.on("error", reject);
+      // destroy the request after 10 seconds of socket inactivity
       request.setTimeout(10_000, () => {
         request.destroy(new Error("Request time out."));
       });
     });
+
+    // helper function checks whether a value is an object and it is not null
+    function isRecord(value: unknown): value is Record<string, unknown> {
+        return typeof value === "object" && value !== null;
+    }
 }
 
 
