@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "nodemon --exec tsx src/server.ts"
+    "callback": "tsx src/callbackVersion.ts",
+    "promise": "node src/promiseVersion.ts"
   },
   "repository": {
     "type": "git",
@@ -16,13 +17,15 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/NeeloByron/-Async-Weather-And-News-Dashboard/issues"
   },
   "homepage": "https://github.com/NeeloByron/-Async-Weather-And-News-Dashboard#readme",
   "dependencies": {
     "@types/code": "^4.0.8",
+    "dotenv": "^17.4.2",
+    "run-callback": "^3.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^7.0.2"
   },
