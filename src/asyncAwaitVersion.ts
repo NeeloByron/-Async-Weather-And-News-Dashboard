@@ -3,7 +3,7 @@
 // - Refactor Promise code to use async/await
 // - Handle errors with try...catch
 import "dotenv/config"
-import * as readline from "node:readline";
+import * as readline from "node:readline/promises";
 import *  as https from "node:https"
 import type { Weather, Post } from "./types";
 
@@ -133,3 +133,59 @@ async function newsEntry() {
     const posts = await fetchNews();
     return { kind: "News" as const, posts };
 }
+
+// The first settled Promise decides the result: success OR failure.
+// The other task continues; Promise.race() doesn't cancel it.
+async function raceExample(city: string, country: string): Promise<void> {
+  const winner = await Promise.race([
+    weatherEntry(city, country),
+    newsEntry(),
+  ]);
+  console.log(`\n${winner.kind} finished first!`);
+  if (winner.kind === "weather") {
+    console.log(`${city}, ${country}: ${winner.weather.temperature} °C, ${winner.weather.description}`);
+  } else {
+    console.log("Sample headlines (DummyJSON):");
+    winner.posts.forEach((post, index) => console.log(`${index + 1}. ${post.title}`));
+  }
+}
+
+async function main(): Promise<void> {
+  let terminal: ReturnType<typeof readline.createInterface> | undefined;
+
+  try {
+    if (!apiKey) throw new Error("OPENWEATHER_API_KEY is not configured.");
+    if (!["chain", "all", "race"].includes(mode)) {
+      throw new Error("Choose a mode: chain, all, or race.");
+    }
+
+    terminal = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const city = (await terminal.question("Which city are you in? ")).trim();
+    if (!city) throw new Error("Please enter a city name.");
+
+    const country = (await terminal.question("Country code (e.g., ZA): ")).trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(country)) {
+      throw new Error("Please enter a two-letter country code.");
+    }
+    terminal.close();
+    console.log(`Fetching weather and sample headlines (${mode})...`);
+
+    // await lets errors from these functions reach our catch block.
+    if (mode === "all") {
+      await allExample(city, country);
+    } else if (mode === "race") {
+      await raceExample(city, country);
+    } else {
+      await sequentialExample(city, country);
+    }
+  } catch (error: unknown) {
+    // Handle input errors, failed requests, and invalid response data here.
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  } finally {
+    // Clean up whether the program succeeds or fails.
+    terminal?.close();
+  }
+}
+
+void main();

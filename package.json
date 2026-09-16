@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "callback": "tsx src/callbackVersion.ts",
     "promise": "node src/promiseVersion.ts",
-    "async": "tsx asyncAwaitVersion.ts"
+    "async": "tsx src/asyncAwaitVersion.ts"
   },
   "repository": {
     "type": "git",
