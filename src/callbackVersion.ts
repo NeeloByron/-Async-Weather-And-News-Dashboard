@@ -4,6 +4,7 @@
 import "dotenv/config"
 import * as readline from "node:readline"; // lets app read text the user types in the terminal.
 import * as https from "node:https";
+import type { Weather, Post } from "./types";
 
 // weather api call from .env
 const apiKey = process.env.OPENWEATHER_API_KEY;
