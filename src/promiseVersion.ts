@@ -5,10 +5,7 @@
 import "dotenv/config"
 import * as readline from "node:readline";
 import * as https from "node:https";
-
-// types
-type Weather = { temperature: number; description: string};
-type Post = { title: string };
+import type { Weather, Post } from "./types"
 
 // Constant apiKey and mode 
 const apiKey = process.env.OPENWEATHER_API_KEY;
@@ -53,7 +50,6 @@ function getJson(url: URL | string): Promise<unknown> {
         request.destroy(new Error("Request time out."));
       });
     });
-
 }
 
 // this function does two jobs 1. finds the city's map coordinates & uses those coordinates to fetch its weather.
