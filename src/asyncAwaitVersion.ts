@@ -53,3 +53,35 @@ function getJson(url: URL | string): Promise<unknown> {
       });
     });
 }
+
+// find the city's location then fetch its weather async lets us use await. The function returns a Promise of weather data
+async function fetchWeather(city: string, country: string): Promise<Weather> {
+    if (!apiKey) throw new Error("OPENWEATHER_API_KEY is not configured.");
+// build the address for finding a city's location
+const locationUrl = new URL("https://api.openweathermap.org/geo/1.0/direct");
+// add the city and country for e.g., "Cape Town, ZA"
+locationUrl.searchParams.set("q", `${city},${country}`);
+// Ask for just one matching location
+locationUrl.searchParams.set("limit", "1");
+// add our API Key
+locationUrl.searchParams.set("appid", apiKey);
+
+//wait for the coordinates before asking for the weather.
+const locations = await getJson(locationUrl);
+if (!Array.isArray(locations) || !isRecord(locations[0]) || typeof locations[0].lat !== "number" || typeof locations[0].lon !== "number") {
+    throw new Error("City not found or invalid location response.");
+}
+
+// find the city's location, then fetch its weather async lets us use await. the function returns a promise of weather data.
+const weatherUrl = new URL("https://api.openweathermap.org/data/2.5/weather");
+  weatherUrl.searchParams.set("lat", String(locations[0].lat));
+  weatherUrl.searchParams.set("lon", String(locations[0].lon));
+  weatherUrl.searchParams.set("appid", apiKey);
+  weatherUrl.searchParams.set("units", "metric");
+
+  const weather = await getJson(weatherUrl);
+  if (!isRecord(weather) || !isRecord(weather.main) || typeof weather.main.temp !== "number" || !Array.isArray(weather.weather) || !isRecord(weather.weather[0]) || typeof weather.weather[0].description !== "string") {
+    throw new Error("Unexpected weather response.");
+  }
+  return { temperature: weather.main.temp, description: weather.weather[0].description };
+}
