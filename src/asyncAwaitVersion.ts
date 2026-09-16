@@ -85,3 +85,51 @@ const weatherUrl = new URL("https://api.openweathermap.org/data/2.5/weather");
   }
   return { temperature: weather.main.temp, description: weather.weather[0].description };
 }
+
+// fetch sample posts and return a list of posts with text titles.
+async function fetchNews(): Promise<Post[]> {
+    const news = await getJson("https://dummyjson.com/posts?limit=3");
+    if (!isRecord(news) || !Array.isArray(news.posts) ||
+        !news.posts.every((post: unknown) => isRecord(post) && typeof post.title === "string")) {
+            throw new Error("Unexpected news response.");
+        }
+    return news.posts as Post[];      
+} 
+
+// show the weather and sample headlines in the terminal 
+// void means this function doesn't return a value 
+function display(city: string, country: string, weather: Weather, posts: Post[]): void {
+    console.log(`\nWeather in ${city}, ${country}`);
+    console.log(`Temperature: ${weather.temperature} °C`);
+    console.log(`Conditions: ${weather.description}`);
+    console.log("\nSample headlines (DummyJSON):");
+    posts.forEach((post, index) => console.log(`${index + 1}. ${post.title}`));
+}
+
+// sequential finish weather, then fetch news then display
+async function sequentialExample(city: string, country: string): Promise<void> {
+    const weather = await fetchWeather(city, country);
+    const posts = await fetchNews();
+    display(city, country, weather, posts);
+}
+
+// start both tasks together and wait
+async function allExample(city: string, country: string): Promise<void> {
+    const [weather, posts] = await Promise.all([
+        fetchWeather(city, country),
+        fetchNews(),
+    ]);
+    display(city, country, weather, posts);
+}
+
+// label each result so the race tell us which finished first
+async function weatherEntry(city: string, country: string) {
+    const weather = await fetchWeather(city, country);
+    return { kind: "weather" as const, weather };
+}
+
+// fetch the posts and label the result so we know it come from news.
+async function newsEntry() {
+    const posts = await fetchNews();
+    return { kind: "News" as const, posts };
+}
