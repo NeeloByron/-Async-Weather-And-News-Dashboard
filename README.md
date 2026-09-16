@@ -7,9 +7,26 @@ Callbacks, promises, and async/await</p>
 
 <hr>
 
+# to load .env 
+```bash
+# to load .env 
+npm install dotenv 
+```
+
 # Callback
-npm install dotenv // to load .env 
--  "callback": "tsx src/callbackVersion.ts",
+```bash
+# add "callback": "tsx src/callbackVersion.ts" 
+npm npm run callback
+```
 
 # Promise 
-"promise": "node promiseVersion.ts"
+```bash
+# add "promise": "node promiseVersion.ts"
+npm npm run promise
+```
+
+# Async
+```bash
+# Run
+npm run async
+```
