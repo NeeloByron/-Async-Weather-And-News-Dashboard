@@ -6,8 +6,11 @@ import "dotenv/config"
 import * as readline from "node:readline";
 import * as https from "node:https";
 
+// types
 type Weather = { temperature: number; description: string};
 type Post = { title: string };
+
+// Constant apiKey and mode 
 const apiKey = process.env.OPENWEATHER_API_KEY;
 const mode = process.argv[2] ?? "chain"
 
