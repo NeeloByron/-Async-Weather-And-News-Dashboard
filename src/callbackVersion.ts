@@ -4,7 +4,6 @@
 import "dotenv/config"
 import * as readline from "node:readline"; // lets app read text the user types in the terminal.
 import * as https from "node:https";
-import type { Weather, Post } from "./types";
 
 // weather api call from .env
 const apiKey = process.env.OPENWEATHER_API_KEY;
@@ -15,193 +14,255 @@ if (!apiKey) {
     process.exit(1);
 }
 
+// fetch text from a url using an error-first callback
+function fetchData( url: string | URL, callback: (error: Error | null, data?: string) => void) {
+  let completed = false;
+  // finish operation, reporting either an error or the response text
+  function finish(error: Error | null, data?: string) {
+    if (completed) {
+      return;
+    }
+    completed = true;
+    //on failure: callback(error)
+    callback(error, data);
+  }
+
+  const request = https.get(url, (response) => {
+    let body = "";
+
+    response.setEncoding("utf8");
+    response.on("data", (chunk: string) => {
+      body += chunk;
+    });
+
+    response.on("error", (error: Error) => {
+      finish(error);
+    });
+
+    response.on("aborted", () => {
+      finish(new Error("The response was interrupted."));
+    });
+
+    response.on("end", () => {
+      if (response.statusCode !== 200) {
+        finish(new Error(`Request failed: HTTP ${response.statusCode}`));
+        return;
+      }
+
+      finish(null, body);
+    });
+  });
+
+  request.on("error", (error: Error) => {
+    finish(error);
+  });
+}
+
+function fetchLocation(
+  cityName: string,
+  countryCode: string,
+  callback: (
+    error: Error | null,
+    location?: { lat: number; lon: number }
+  ) => void
+) {
+  console.log(`Fetching location for ${cityName}, ${countryCode}...`);
+
+  const url = new URL("https://api.openweathermap.org/geo/1.0/direct");
+  url.searchParams.set("q", `${cityName},${countryCode}`);
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("appid", apiKey!);
+
+  fetchData(url, (error, data) => {
+    if (error) {
+      callback(error);
+      return;
+    }
+
+    let location: { lat: number; lon: number };
+
+    try {
+      const locations = JSON.parse(data!);
+
+      if (
+        !Array.isArray(locations) ||
+        locations.length === 0 ||
+        typeof locations[0]?.lat !== "number" ||
+        typeof locations[0]?.lon !== "number"
+      ) {
+        throw new Error("City not found.");
+      }
+
+      location = {
+        lat: locations[0].lat,
+        lon: locations[0].lon,
+      };
+    } catch (error) {
+      callback(
+        error instanceof Error
+          ? error
+          : new Error("Could not read the location data.")
+      );
+      return;
+    }
+
+    callback(null, location);
+  });
+}
+
+function fetchWeather(
+  latitude: number,
+  longitude: number,
+  callback: (
+    error: Error | null,
+    weather?: { temperature: number; description: string }
+  ) => void
+) {
+  console.log("Fetching weather...");
+
+  const url = new URL("https://api.openweathermap.org/data/2.5/weather");
+  url.searchParams.set("lat", String(latitude));
+  url.searchParams.set("lon", String(longitude));
+  url.searchParams.set("appid", apiKey!);
+  url.searchParams.set("units", "metric");
+
+  fetchData(url, (error, data) => {
+    if (error) {
+      callback(error);
+      return;
+    }
+
+    let weather: { temperature: number; description: string };
+
+    try {
+      const result = JSON.parse(data!);
+
+      if (
+        typeof result?.main?.temp !== "number" ||
+        typeof result?.weather?.[0]?.description !== "string"
+      ) {
+        throw new Error("Unexpected weather response.");
+      }
+
+      weather = {
+        temperature: result.main.temp,
+        description: result.weather[0].description,
+      };
+    } catch (error) {
+      callback(
+        error instanceof Error
+          ? error
+          : new Error("Could not read the weather data.")
+      );
+      return;
+    }
+
+    callback(null, weather);
+  });
+}
+
+function fetchNews(
+  callback: (
+    error: Error | null,
+    news?: { title: string }[]
+  ) => void
+) {
+  console.log("Fetching sample headlines...");
+
+  fetchData("https://dummyjson.com/posts?limit=3", (error, data) => {
+    if (error) {
+      callback(error);
+      return;
+    }
+
+    let news: { title: string }[];
+
+    try {
+      const result = JSON.parse(data!);
+
+      if (
+        !Array.isArray(result?.posts) ||
+        !result.posts.every(
+          (post: { title?: unknown } | null) =>
+            typeof post?.title === "string"
+        )
+      ) {
+        throw new Error("Unexpected news response.");
+      }
+
+      news = result.posts;
+    } catch (error) {
+      callback(
+        error instanceof Error
+          ? error
+          : new Error("Could not read the news data.")
+      );
+      return;
+    }
+
+    callback(null, news);
+  });
+}
+
 const terminal = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
+  input: process.stdin,
+  output: process.stdout,
 });
 
-let cityName = "";
-let locationRequest: ReturnType<typeof https.get>;
-
-// question about which city you in 
 terminal.question("Which city are you in? ", (city) => {
-  cityName = city.trim();
+  const cityName = city.trim();
 
-    if (!cityName) {
-        console.error("Please enter a city name.");
-        terminal.close();
-        return;
-    }
+  if (!cityName) {
+    console.error("Please enter a city name.");
+    terminal.close();
+    return;
+  }
 
-// country code question
-terminal.question("country code (for e.g., ZA): ", (country) => {
-    const countryCode = country.trim().toLocaleUpperCase();
+  terminal.question("Country code (for example, ZA): ", (country) => {
+    const countryCode = country.trim().toUpperCase();
     terminal.close();
 
-    // error for the country code if invalid/more characters
     if (!/^[A-Z]{2}$/.test(countryCode)) {
-        console.error("Please enter a two-letter country code.");
-        return;
+      console.error("Please enter a two-letter country code.");
+      return;
     }
 
-    const locationUrl = new URL ("https://api.openweathermap.org/geo/1.0/direct");
-    locationUrl.searchParams.set("q", `${cityName},${countryCode}`);
-    locationUrl.searchParams.set("limit", "1");
-    locationUrl.searchParams.set("appid", apiKey);
+    // Nested callbacks, matching the style in your screenshots.
+    fetchLocation(cityName, countryCode, (error, location) => {
+      if (error) {
+        console.error("Error fetching location:", error.message);
+        return;
+      }
 
-    // first request: find the city's coordinates
-    locationRequest = https.get(locationUrl, (locationResponse) => {
-        let locationBody = "";
-
-        locationResponse.setEncoding("utf-8");
-
-        locationResponse.on("data", (chunk: string) => {
-            locationBody += chunk;
-        });
-         // error message
-       locationResponse.on("error", (error: Error) => {
-        console.error("Location response failed:", error.message);
-       });
-            // location lookup
-       locationResponse.on("end", () => {
-        if (locationResponse.statusCode !== 200) {
-            console.error(`Location lookup failed: HTTP ${locationResponse.statusCode}`);
-            return;
-        }
-          let location: { lat: number; lon: number };
-          try {
-            const locations = JSON.parse(locationBody);
-
-            if (
-              !Array.isArray(locations) ||
-              locations.length === 0 ||
-              typeof locations[0]?.lat !== "number" ||
-              typeof locations[0]?.lon !== "number"
-            ) {
-              console.error("City not found.");
-              return;
-            }
-
-            location = locations[0];
-          } catch {
-            console.error("Could not read the location data.");
+      if (location) {
+        fetchWeather(location.lat, location.lon, (error, weather) => {
+          if (error) {
+            console.error("Error fetching weather:", error.message);
             return;
           }
 
-            const weatherUrl = new URL ("https://api.openweathermap.org/data/2.5/weather");
-             // weather searches 
-            weatherUrl.searchParams.set("lat", String(location.lat));
-            weatherUrl.searchParams.set("lon", String(location.lon));
-            weatherUrl.searchParams.set("appid", apiKey);
-            weatherUrl.searchParams.set("units", "metric");
+          if (weather) {
+            fetchNews((error, news) => {
+              if (error) {
+                console.error("Error fetching news:", error.message);
+                return;
+              }
 
-            // Nested request: weather depends on the coordinates above.
-            const weatherRequest = https.get(weatherUrl, (weatherReponse) => {
-                let weatherBody = "";
+              if (news) {
+                console.log(`\nWeather in ${cityName}, ${countryCode}`);
+                console.log(`Temperature: ${weather.temperature} °C`);
+                console.log(`Conditions: ${weather.description}`);
 
-                weatherReponse.setEncoding("utf-8");
+                console.log("\nSample headlines (DummyJSON):");
 
-                weatherReponse.on("data", (chunk: string) => {
-                    weatherBody += chunk;
+                news.forEach((post, index) => {
+                  console.log(`${index + 1}. ${post.title}`);
                 });
-
-                weatherReponse.on("error", (error: Error) => {
-                    console.error("Weather response failed:", error.message);
-                });
-
-                weatherReponse.on("end", () => {
-                    if (weatherReponse.statusCode !== 200) {
-                        console.error(`weather request failed: HTTP ${weatherReponse.statusCode}`)
-                        return;
-                    }
-                    
-                    try {
-                        const weather = JSON.parse(weatherBody);
-
-                        if (
-                            typeof weather?.main?.temp !== "number" ||
-                            typeof weather?.weather?.[0]?.description !== "string"
-                        ) {
-                            console.error("Unexpected weather response.");
-                            return;
-                        }
-
-                        // further nesting for show off callback hell :)
-                        const newsRequest = https.get("https://dummyjson.com/posts?limit=3", (newsResponse) => {
-                            let newsBody = "";
-
-                             newsResponse.setEncoding("utf8");
-
-                    newsResponse.on("data", (chunk: string) => {
-                      newsBody += chunk;
-                    });
-
-                    newsResponse.on("error", (error: Error) => {
-                      console.error("News response failed:", error.message);
-                    });
-
-                    newsResponse.on("end", () => {
-                      if (newsResponse.statusCode !== 200) {
-                        console.error(
-                          `News request failed: HTTP ${newsResponse.statusCode}`
-                        );
-                        return;
-                      }
-
-                      try {
-                        const news = JSON.parse(newsBody);
-
-                        if (
-                          !Array.isArray(news?.posts) ||
-                          !news.posts.every(
-                            (post: { title?: unknown } | null) =>
-                              typeof post?.title === "string"
-                          )
-                        ) {
-                          console.error("Unexpected news response.");
-                          return;
-                        }
-
-                        // Both results are available in this inner callback.
-                        console.log(`\nWeather in ${cityName}, ${countryCode}`);
-                        console.log(`Temperature: ${weather.main.temp} °C`);
-                        console.log(
-                          `Conditions: ${weather.weather[0].description}`
-                        );
-
-                        console.log("\nSample headlines (DummyJSON):");
-
-                        news.posts.forEach(
-                          (post: { title: string }, index: number) => {
-                            console.log(`${index + 1}. ${post.title}`);
-                          }
-                        );
-                      } catch {
-                        console.error("Could not read the news data.");
-                      }
-                    });
-                  }
-                );
-
-                newsRequest.on("error", (error: Error) => {
-                  console.error("News connection failed:", error.message);
-                });
-              } catch (error) {
-                console.error("Could not read the weather data.");
               }
             });
-          });
-
-          weatherRequest.on("error", (error: Error) => {
-            console.error("Weather connection failed:", error.message);
-          });
-      });
+          }
+        });
+      }
     });
-
-    locationRequest.on("error", (error: Error) => {
-      console.error("Location connection failed:", error.message);
-    });
-
-    console.log("Fetching your weather and sample headlines...");
   });
-   });
+});
