@@ -8,3 +8,4 @@ export type Weather = {
 export type Post = { 
     title: string;
 }
+ 
